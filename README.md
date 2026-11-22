@@ -39,3 +39,17 @@ npm run preview
 The static output is dist/. Browser checks require an already provisioned Playwright Chromium; starting the app never installs it. See [participant guide](docs/PARTICIPANT_GUIDE.md), [architecture](docs/architecture.md), [current features](FEATURES.md) and [case protocol](docs/case/CASE_PROTOCOL.md).
 
 To distribute a baseline participant package, run npm run package:participant -- /absolute/output/directory. This excludes Git history and instructor source material. Never distribute this repository’s history as a stage-safe packet.
+
+### Verify a fresh checkout on Windows
+
+After the LF policy reaches `main`, open PowerShell in your existing checkout. A regular pull can leave CRLF in files Git does not rewrite. Use a new sibling directory to check the latest remote `main` with LF line endings. Your current branch and all staged, unstaged and untracked changes stay in your original checkout.
+
+```powershell
+git fetch origin
+git worktree add --detach ..\DoRoboty-ai-check origin/main
+Set-Location ..\DoRoboty-ai-check
+npm ci
+npm run check
+```
+
+Use a different directory name if `DoRoboty-ai-check` already exists. The check includes browser tests, so use the provisioned Playwright Chromium.

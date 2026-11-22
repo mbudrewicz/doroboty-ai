@@ -303,6 +303,12 @@ test("the prepared E01 candidate reveals five substantive answers before a fresh
   await page.getByLabel("Raczej odrzucam, ale mam wątpliwości.", { exact: true }).check();
   await page.getByRole("button", { name: "Zapisz", exact: true }).click();
   await expect(page.locator(".record-meta .record-stage")).toHaveText("Odrzucenie kandydata");
-  await page.getByRole("link", { name: "Kandydaci", exact: true }).last().click();
-  await expect(page.getByText("Odrzucenie kandydata", { exact: true })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Ścieżka nawigacji" })
+    .getByRole("link", { name: "Kandydaci", exact: true })
+    .click();
+  const candidateCard = page.getByRole("article").filter({
+    has: page.getByRole("link", { name: "Marek Nowak", exact: true }),
+  });
+  await expect(candidateCard.getByText("Odrzucenie kandydata", { exact: true })).toBeVisible();
 });
