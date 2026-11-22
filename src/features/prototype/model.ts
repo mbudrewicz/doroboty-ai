@@ -25,8 +25,19 @@ const id = z
   .max(100)
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/);
 const shortText = z.string().trim().min(1).max(200);
-const text = z.string().trim().max(12000);
+const maxTextLength = 12000;
+const answerSnapshot = z.string().trim();
+const text = answerSnapshot.max(maxTextLength);
 export const MIN_APPLICATION_ANSWER_LENGTH = 20;
+function hasValidAnswerLength({
+  answer,
+  project,
+}: {
+  answer: string;
+  project?: ProjectDescription;
+}) {
+  return answer.length <= maxTextLength || (!!project && answer === projectText(project).trim());
+}
 const companySchema = z.object({
   id,
   slug: id,
@@ -124,38 +135,42 @@ export const nextStages: Record<Stage, Stage[]> = {
   withdrawn: [],
   hired: [],
 };
-const applicationSchema = z.object({
-  id,
-  candidateId: id,
-  jobId: id,
-  companyId: id,
-  jobTitle: shortText,
-  candidateName: shortText,
-  cv: text.min(20),
-  answer: text.min(MIN_APPLICATION_ANSWER_LENGTH),
-  project: projectSubmissionSchema.optional(),
-  projectContext: projectContextSchema.optional(),
-  reviews: z.array(candidateReviewSchema).max(100).optional(),
-  e01: z.array(e01Schema).max(100).optional(),
-  sourceNotes: text,
-  generatedAnswer: text,
-  score: z.number().int().min(0).max(100),
-  summary: text,
-  stage: z.enum(stages),
-  events: z
-    .array(z.object({ stage: z.enum(stages), at: z.iso.datetime(), note: text }))
-    .min(1)
-    .max(30),
-});
-const draftSchema = z.object({
-  candidateId: id,
-  jobId: id,
-  notes: text,
-  generated: text,
-  answer: text,
-  project: projectDraftSchema.optional(),
-  introduction: text.optional(),
-});
+const applicationSchema = z
+  .object({
+    id,
+    candidateId: id,
+    jobId: id,
+    companyId: id,
+    jobTitle: shortText,
+    candidateName: shortText,
+    cv: text.min(20),
+    answer: answerSnapshot.min(MIN_APPLICATION_ANSWER_LENGTH),
+    project: projectSubmissionSchema.optional(),
+    projectContext: projectContextSchema.optional(),
+    reviews: z.array(candidateReviewSchema).max(100).optional(),
+    e01: z.array(e01Schema).max(100).optional(),
+    sourceNotes: text,
+    generatedAnswer: text,
+    score: z.number().int().min(0).max(100),
+    summary: text,
+    stage: z.enum(stages),
+    events: z
+      .array(z.object({ stage: z.enum(stages), at: z.iso.datetime(), note: text }))
+      .min(1)
+      .max(30),
+  })
+  .refine(hasValidAnswerLength, { path: ["answer"], message: "Application answer is too long" });
+const draftSchema = z
+  .object({
+    candidateId: id,
+    jobId: id,
+    notes: text,
+    generated: text,
+    answer: answerSnapshot,
+    project: projectDraftSchema.optional(),
+    introduction: text.optional(),
+  })
+  .refine(hasValidAnswerLength, { path: ["answer"], message: "Application answer is too long" });
 export const stateSchema = z
   .object({
     version: z.literal(1),
@@ -370,7 +385,13 @@ export function transition(
     else s.saved.push({ candidateId: p.id, jobId: action.jobId });
   } else if (action.type === "draft") {
     const p = candidate();
-    const draft = draftSchema.parse({ candidateId: p.id, ...action });
+    const project = action.project ? projectDraftSchema.parse(action.project) : undefined;
+    const draft = draftSchema.parse({
+      ...action,
+      candidateId: p.id,
+      project,
+      answer: project ? projectText(project) : action.answer,
+    });
     s.drafts = s.drafts.filter((x) => !(x.candidateId === p.id && x.jobId === action.jobId));
     s.drafts.push(draft);
   } else if (action.type === "submit") {

@@ -1,6 +1,7 @@
 import { parseState, serializeState } from "./storage";
 import { describe, expect, it } from "vitest";
 import { initialState, transition, stateSchema, type State } from "./model";
+import { projectText } from "./project-description";
 const time = "2026-11-03T10:00:00.000Z";
 function as(state: State, id: string) {
   return transition(state, { type: "select_person", id });
@@ -142,6 +143,36 @@ describe("coherent browser scenario", () => {
 });
 
 describe("structured project submissions", () => {
+  it("saves and submits six full-length project answers without an introduction", () => {
+    const state = as(initialState(), "candidate-anna");
+    const project = {
+      problem: "a".repeat(2000),
+      contribution: "b".repeat(2000),
+      boundaries: "c".repeat(2000),
+      use: "d".repeat(2000),
+      result: "e".repeat(2000),
+      ai: "f".repeat(2000),
+    };
+    const answer = projectText(project);
+    expect(answer.length).toBeGreaterThan(12000);
+    const input = { jobId: state.jobs[0].id, notes: "", generated: "", answer, project };
+    expect(() => transition(state, { ...input, type: "draft", project: undefined })).toThrow();
+    const draftState = parseState(serializeState(transition(state, { ...input, type: "draft" })));
+    expect(draftState.drafts.at(-1)).toMatchObject({ project, answer });
+    const submitted = transition(
+      draftState,
+      { ...input, type: "submit", consent: true, introduction: "" },
+      time,
+      "full-project-application",
+    );
+    const saved = parseState(serializeState(submitted));
+    expect(saved.applications.at(-1)).toMatchObject({ project, answer });
+    expect(saved.drafts).toHaveLength(0);
+    expect(() =>
+      transition(draftState, { ...input, type: "submit", consent: true, introduction: answer }),
+    ).toThrow();
+  });
+
   it("round-trips partial drafts, rejects incomplete submissions and snapshots approved answers", () => {
     let state = as(initialState(), "candidate-anna");
     const jobId = state.jobs[0].id;
