@@ -21,7 +21,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm exec playwright install --with-deps chromium
-      - run: ./scripts/verify
+      - name: Run quality checks and Playwright end-to-end tests
+        run: ./scripts/verify
       - run: npm run package:participant -- /tmp/doroboty-participant
       - uses: actions/upload-artifact@v4
         if: always()
