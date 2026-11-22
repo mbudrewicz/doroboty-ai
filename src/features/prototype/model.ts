@@ -1,7 +1,23 @@
 import { z } from "zod";
+import { e01Schema, firstAssessmentSchema, secondAssessmentSchema, hasDoubts } from "./e01";
+import {
+  candidateReviewSchema,
+  reviewInputSchema,
+  reviewOutcome,
+  reviewComplete,
+} from "./candidate-review";
 import marketplace from "./data/marketplace.json" with { type: "json" };
 import people from "./data/people.json" with { type: "json" };
 import type { JobWithCompany } from "@/features/jobs/types";
+
+import {
+  projectDraftSchema,
+  projectSubmissionSchema,
+  projectText,
+  projectContextSchema,
+  projectContextForRole,
+  type ProjectDescription,
+} from "./project-description";
 
 const id = z
   .string()
@@ -94,6 +110,10 @@ export const stageLabels: Record<Stage, string> = {
   withdrawn: "Wycofana",
   hired: "Zatrudnienie",
 };
+export const employerStageLabels: Record<Stage, string> = {
+  ...stageLabels,
+  rejected: "Odrzucenie kandydata",
+};
 export const nextStages: Record<Stage, Stage[]> = {
   submitted: ["reviewed", "rejected"],
   reviewed: ["interview_invited", "rejected"],
@@ -113,6 +133,10 @@ const applicationSchema = z.object({
   candidateName: shortText,
   cv: text.min(20),
   answer: text.min(MIN_APPLICATION_ANSWER_LENGTH),
+  project: projectSubmissionSchema.optional(),
+  projectContext: projectContextSchema.optional(),
+  reviews: z.array(candidateReviewSchema).max(100).optional(),
+  e01: z.array(e01Schema).max(100).optional(),
   sourceNotes: text,
   generatedAnswer: text,
   score: z.number().int().min(0).max(100),
@@ -129,6 +153,8 @@ const draftSchema = z.object({
   notes: text,
   generated: text,
   answer: text,
+  project: projectDraftSchema.optional(),
+  introduction: text.optional(),
 });
 export const stateSchema = z
   .object({
@@ -162,6 +188,28 @@ export const stateSchema = z
     for (const j of s.jobs) if (!companyIds.has(j.companyId)) problem("Unknown job company");
     const keys = new Set<string>();
     for (const a of s.applications) {
+      const records = a.e01 ?? [];
+      const reviews = a.reviews ?? [];
+      if (
+        new Set(reviews.map((r) => r.recruiterId)).size !== reviews.length ||
+        reviews.some(
+          (r) =>
+            !s.people.some(
+              (p) => p.id === r.recruiterId && p.role === "employer" && p.companyId === a.companyId,
+            ),
+        )
+      )
+        problem("Invalid review recruiter");
+      if (
+        new Set(records.map((r) => r.recruiterId)).size !== records.length ||
+        records.some(
+          (r) =>
+            !s.people.some(
+              (p) => p.id === r.recruiterId && p.role === "employer" && p.companyId === a.companyId,
+            ),
+        )
+      )
+        problem("Invalid E01 recruiter");
       const key = `${a.candidateId}:${a.jobId}`;
       if (
         !candidates.has(a.candidateId) ||
@@ -198,10 +246,26 @@ export type State = z.infer<typeof stateSchema>;
 export type Person = State["people"][number];
 export type Application = State["applications"][number];
 export type Action =
+  | { type: "review_save"; applicationId: string; value: z.infer<typeof reviewInputSchema> }
+  | { type: "review_reveal"; applicationId: string }
+  | { type: "review_decline"; applicationId: string }
+  | { type: "review_note"; applicationId: string; note: string }
+  | { type: "stage_note"; applicationId: string; stage: Stage; note: string }
+  | { type: "e01_first"; applicationId: string; value: z.infer<typeof firstAssessmentSchema> }
+  | { type: "e01_reveal"; applicationId: string }
+  | { type: "e01_second"; applicationId: string; value: z.infer<typeof secondAssessmentSchema> }
   | { type: "select_person"; id: string | null }
   | { type: "profile"; value: z.infer<typeof profileSchema> }
   | { type: "toggle_saved"; jobId: string }
-  | { type: "draft"; jobId: string; notes: string; generated: string; answer: string }
+  | {
+      type: "draft";
+      jobId: string;
+      notes: string;
+      generated: string;
+      answer: string;
+      project?: ProjectDescription;
+      introduction?: string;
+    }
   | {
       type: "submit";
       jobId: string;
@@ -209,6 +273,8 @@ export type Action =
       generated: string;
       answer: string;
       consent: boolean;
+      project?: ProjectDescription;
+      introduction?: string;
     }
   | { type: "stage"; applicationId: string; stage: Stage; note: string }
   | { type: "withdraw"; applicationId: string }
@@ -237,6 +303,19 @@ export function initialState(): State {
     cv: bob.cv,
     answer:
       "Pracowałem nad automatyzacją obsługi zgłoszeń. Poprowadziłem badania z użytkownikami i wdrożenie, które skróciło czas odpowiedzi o 25%. Chętnie opowiem o decyzjach i ograniczeniach tego projektu.",
+    project: {
+      problem:
+        "W syntetycznym projekcie platformy B2B zespół obsługi ręcznie kierował zgłoszenia do właściwych osób. Celem było ograniczenie oczekiwania klientów.",
+      contribution:
+        "Poprowadziłem warsztaty z obsługą i przygotowałem reguły kategoryzacji. Wybrałem pilotaż dla jednego rodzaju zgłoszeń, ponieważ zespół potrafił ręcznie sprawdzić błędy.",
+      boundaries:
+        "Sam opracowałem backlog i kryteria odbioru. Inżynierowie zbudowali integrację, a analityczka przygotowała pomiar. Korzystaliśmy z istniejącej platformy i gotowego modelu.",
+      use: "Pilotaż działał przez cztery tygodnie w jednym zespole obsługi. Wdrożenie techniczne wykonali inżynierowie. Nie znam wyników późniejszego rozszerzenia.",
+      result:
+        "Według przygotowanego przez analityczkę porównania czterech tygodni przed pilotażem i w jego trakcie czas odpowiedzi zmalał o 25%. To wynik zespołu; nie mogę przypisać go wyłącznie swoim działaniom. Nie sprawdziliśmy wpływu sezonowości.",
+      ai: "Model sugerował kategorię zgłoszenia. Porównałem jego sugestie z kategoriami przypisanymi wcześniej przez zespół obsługi. Przy niejednoznacznych zgłoszeniach pracownik wybierał kategorię ręcznie.",
+    },
+    projectContext: projectContextForRole(job),
     sourceNotes: "",
     generatedAnswer: "",
     score: bob.exampleScore,
@@ -254,6 +333,9 @@ export function publishedJobs(state: State): JobWithCompany[] {
 }
 export function currentPerson(state: State) {
   return state.people.find((x) => x.id === state.activePersonId);
+}
+export function hasHeldFirstConversation({ events }: Pick<Application, "events">) {
+  return events.some((event) => event.stage === "first_conversation_held");
 }
 export function transition(
   state: State,
@@ -298,6 +380,7 @@ export function transition(
     if (!action.consent) fail("Zatwierdź treść i zgodę na przesłanie aplikacji.");
     if (s.applications.some((x) => x.candidateId === p.id && x.jobId === job.id))
       fail("Aplikacja na tę ofertę została już wysłana.");
+    const project = action.project ? projectSubmissionSchema.parse(action.project) : undefined;
     s.applications.push(
       applicationSchema.parse({
         id: newId,
@@ -307,7 +390,13 @@ export function transition(
         jobTitle: job.title,
         candidateName: p.name,
         cv: p.cv,
-        answer: action.answer,
+        answer: project
+          ? action.introduction?.trim()
+            ? text.min(MIN_APPLICATION_ANSWER_LENGTH).parse(action.introduction)
+            : projectText(project)
+          : action.answer,
+        project,
+        projectContext: project ? projectContextForRole(job) : undefined,
         sourceNotes: action.notes,
         generatedAnswer: action.generated,
         score: p.exampleScore,
@@ -317,6 +406,116 @@ export function transition(
       }),
     );
     s.drafts = s.drafts.filter((x) => !(x.candidateId === p.id && x.jobId === job.id));
+  } else if (
+    action.type === "review_save" ||
+    action.type === "review_reveal" ||
+    action.type === "review_decline" ||
+    action.type === "review_note"
+  ) {
+    const p = employer();
+    const application = s.applications.find(
+      (a) => a.id === action.applicationId && a.companyId === p.companyId,
+    );
+    if (!application) return fail("Nie znaleziono aplikacji własnej firmy.");
+    const record = application.reviews?.find((r) => r.recruiterId === p.id);
+    if (action.type === "review_note") {
+      if (!record || !reviewComplete(record)) return fail("Najpierw zakończ ocenę kandydata.");
+      if (hasHeldFirstConversation(application))
+        return fail("Po pierwszej rozmowie zapisz notatkę przy aktualnym etapie.");
+      record.completionNote = text.parse(action.note);
+    } else {
+      if (!["submitted", "reviewed"].includes(application.stage))
+        return fail("Ocena jest dostępna tylko przed zaproszeniem lub odrzuceniem.");
+      let outcome: Stage | undefined;
+      let eventNote = "";
+      if (action.type === "review_reveal" || action.type === "review_decline") {
+        if (
+          !record ||
+          !hasDoubts(record.first.assessment) ||
+          record.revealedAt ||
+          reviewComplete(record)
+        )
+          return fail("Dodatkowe informacje nie są dostępne w tym kroku.");
+        if (action.type === "review_reveal") record.revealedAt = now;
+        else {
+          record.declinedAt = now;
+          record.completedAt = now;
+          outcome = reviewOutcome(record.first.assessment);
+          eventNote = record.first.note;
+        }
+      } else {
+        const value = reviewInputSchema.parse(action.value);
+        const round = { ...value, at: now };
+        if (record) {
+          if (!record.revealedAt || reviewComplete(record))
+            return fail("Ponowna ocena nie jest dostępna w tym kroku.");
+          record.followups.push(round);
+          record.completedAt = now;
+          outcome = reviewOutcome(value.assessment);
+        } else {
+          (application.reviews ??= []).push({
+            recruiterId: p.id,
+            first: round,
+            followups: [],
+            flowVersion: 2,
+            completedAt: hasDoubts(value.assessment) ? undefined : now,
+          });
+          if (!hasDoubts(value.assessment)) outcome = reviewOutcome(value.assessment);
+        }
+        eventNote = value.note;
+      }
+      if (outcome) {
+        if (application.stage === "submitted" && outcome === "interview_invited") {
+          application.stage = "reviewed";
+          application.events.push({ stage: "reviewed", at: now, note: "" });
+        }
+        if (application.stage !== outcome) {
+          application.stage = outcome;
+          application.events.push({ stage: outcome, at: now, note: eventNote });
+        }
+      }
+    }
+  } else if (
+    action.type === "e01_first" ||
+    action.type === "e01_reveal" ||
+    action.type === "e01_second"
+  ) {
+    const p = employer();
+    const application = s.applications.find(
+      (a) => a.id === action.applicationId && a.companyId === p.companyId,
+    );
+    if (!application) return fail("Nie znaleziono aplikacji własnej firmy.");
+    const record = application.e01?.find((r) => r.recruiterId === p.id);
+    if (action.type === "e01_first") {
+      if (record) return fail("Pierwsza ocena została już zapisana.");
+      const value = firstAssessmentSchema.parse(action.value);
+      (application.e01 ??= []).push({
+        revision: 5,
+        recruiterId: p.id,
+        requirement: value.requirement,
+        first: value.assessment,
+        firstAt: now,
+      });
+    } else {
+      if (!record || !hasDoubts(record.first) || record.second)
+        return fail("Ta ścieżka E01 jest niedostępna.");
+      if (action.type === "e01_reveal") {
+        if (record.revealedAt) return fail("Opis został już pokazany.");
+        record.revealedAt = now;
+      } else {
+        if (!record.revealedAt) return fail("Najpierw pokaż opis projektu.");
+        record.second = { ...secondAssessmentSchema.parse(action.value), at: now };
+      }
+    }
+  } else if (action.type === "stage_note") {
+    const p = employer();
+    const application = s.applications.find(
+      (candidate) => candidate.id === action.applicationId && candidate.companyId === p.companyId,
+    );
+    if (!application || !hasHeldFirstConversation(application))
+      return fail("Notatkę do etapu można zapisać po pierwszej rozmowie.");
+    if (application.stage !== action.stage) return fail("Etap procesu się zmienił.");
+    application.events.at(-1)!.note = text.parse(action.note);
   } else if (action.type === "stage" || action.type === "withdraw") {
     const application = s.applications.find((x) => x.id === action.applicationId);
     if (!application) return fail("Nie znaleziono aplikacji.");

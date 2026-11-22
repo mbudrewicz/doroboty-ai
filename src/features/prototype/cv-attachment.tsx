@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import people from "./data/people.json" with { type: "json" };
 
@@ -14,12 +15,14 @@ export function CvAttachment({
   layout = "stack",
   preview = false,
   contextLabel = "CV z momentu aplikowania",
+  previewControl,
 }: {
   candidateId: string;
   fallbackText: string;
   layout?: "stack" | "row";
   preview?: boolean;
   contextLabel?: string;
+  previewControl?: ReactNode;
 }) {
   const filename = candidateFiles.get(candidateId);
   const source = people.find((person) => person.id === candidateId);
@@ -70,6 +73,7 @@ export function CvAttachment({
           >
             Pobierz CV (PDF)
           </a>
+          {previewControl}
         </div>
       </div>
       {preview && (

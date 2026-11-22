@@ -4,6 +4,8 @@ These components implement the shared employer and candidate process-view compos
 
 ## RecordSheet
 
+The I01/E01 prototype adds an optional `reading` React node for a sheet without tabs; pass `sections={[]}` in that mode. The existing candidate tab composition remains supported. Employer detail uses CandidateReviewPanel and the diagram flow recorded in `docs/tasks/recruiter-diagram-flow.md`: About candidate, independent submitted answer, CV open/download/preview, assessment and note. Both assessments use Zapisz and present rating labels without outcome hints or a status preview. Saving an uncertain first assessment opens a Base UI information-choice dialog. Close/Escape suspends the choice; explicit No finalizes; Yes reveals five grouped project areas. CandidateReviewPanel uses one C22-derived paper speech bubble with a short tail and visible answer label for the independent answer and project answers. The C13 links to assessment and additional information preserve the hash route and restore scroll and focus at the selected heading. The second form starts unselected and does not render the previous rating or result panel. Final directional ratings (including lean choices) set invitation/rejection; Unknown stays reviewed. Completion keeps the assessment link and shows the saved ratings in the same named section. Saving an optional assessment note updates the relevant history entry until the first recorded conversation. From that point the separate recruiter note editor updates the current stage entry. The assessment summary uses the shared stage pill. Record/result and additional-information headings receive logical focus after save/dialog closure. Preserve the single outlined reading surface and candidate submitted tabs. Legacy E01/review records remain intact.
+
 Owner: src/components/record-sheet.tsx; styles: src/app/records.css.
 
 | Prop       | Contract                                                                                                                                                                       |
@@ -20,13 +22,14 @@ Use one outlined surface for related submitted materials, editing and decisions.
 
 Owner: [cv-attachment.tsx](../../src/features/prototype/cv-attachment.tsx).
 
-| Prop         | Contract                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| candidateId  | Required scenario candidate identifier.                                                             |
-| fallbackText | Required full saved CV text; compare this snapshot with the fixture before choosing a prepared PDF. |
-| layout       | `stack` (default) or `row`; both preserve the existing file actions.                                |
-| preview      | Boolean, default false; embed the matching local PDF, otherwise render the complete custom text.    |
-| contextLabel | Defaults to “CV z momentu aplikowania”; editable application uses “CV z Twojego profilu”.           |
+| Prop           | Contract                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| candidateId    | Required scenario candidate identifier.                                                             |
+| fallbackText   | Required full saved CV text; compare this snapshot with the fixture before choosing a prepared PDF. |
+| layout         | `stack` (default) or `row`; both preserve the existing file actions.                                |
+| preview        | Boolean, default false; embed the matching local PDF, otherwise render the complete custom text.    |
+| previewControl | Optional React node alongside prepared PDF file actions; ignored for custom text CVs.               |
+| contextLabel   | Defaults to “CV z momentu aplikowania”; editable application uses “CV z Twojego profilu”.           |
 
 CvAttachment's `layout="row"` supplies an unboxed icon, filename/context and existing local open/download links. Default `layout="stack"` preserves profile and submitted candidate-detail consumers; the editable application form uses the row composition. `contextLabel` describes the attachment context (default: submitted snapshot; the application form uses “CV z Twojego profilu”). Row-mode custom CVs retain their complete saved text. `preview` adds a titled, framed native PDF iframe beneath the file row, using the exact same local snapshot URL as the file links. Mount this composition inside the CV panel, not the persistent attachment slot: the Answer panel has no CV controls or viewer. Keep open/download links available when the browser cannot display an embedded PDF. No PDF parsing, remote viewer or dependency is added. Only a matching immutable fixture snapshot gets its prepared PDF; custom text snapshots with preview enabled get an explicit text descriptor and their complete text instead of an iframe. Never label a mismatched prepared PDF as the submitted CV.
 
@@ -48,7 +51,7 @@ Both roles use H3 answer/CV headings, CV-only local preview/actions and complete
 
 Owner: src/features/prototype/recruiting-application.tsx. At wide widths, open history/summary margin sits left of a single sheet. At <=950px, materials precede history in both DOM and visual reading order; history and summary share two columns until <=600px, then stack. Header and actions wrap; narrow pages retain complete content at 320px. At Wojtek’s request the unchanged scenario Match Score is a noninteractive supporting-fact tag in the metadata row below the candidate name; the visible “Wynik przykładowy” caption is removed. The summary stays below history. This placement does not add automated assessment behavior.
 
-Keep actual available transitions from `nextStages`. Notes append only on successful stage mutation and then clear; failure retains them. Move focus to the updated status after action buttons change, announce success politely and omit note/actions at terminal stages. Candidate and employer controllers share ApplicationRecord but retain their separate action and history-visibility boundaries. Preserve ownership checks before rendering this composition. A role label describes this scenario's UI visibility, not secure storage.
+Keep actual available transitions from `nextStages`. After the first recorded conversation, the separate note form loads and saves the current stage entry and announces success politely. On stage change, the form loads the new stage note. Move focus to the updated status after stage actions change. Terminal stages omit further stage actions. Candidate and employer controllers share ApplicationRecord but retain their separate action and history-visibility boundaries. Preserve ownership checks before rendering this composition. A role label describes this scenario's UI visibility, not secure storage.
 
 Validate keyboard tabs/focus, note retention, local PDF snapshot identity, custom/long imported content, terminal states, mobile order, role omissions and persistence. Run the project gate and compare real screenshots against the selected composition and source foundations. Test results do not establish human design acceptance.
 

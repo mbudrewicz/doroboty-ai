@@ -10,11 +10,25 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { JobCard } from "@/features/jobs/job-card";
 import { ApplicationOfferPreview } from "@/features/jobs/application-offer-preview";
 import { usePrototype } from "./store";
-import { currentPerson, publishedJobs, stageLabels, MIN_APPLICATION_ANSWER_LENGTH } from "./model";
+import {
+  currentPerson,
+  employerStageLabels,
+  publishedJobs,
+  stageLabels,
+  MIN_APPLICATION_ANSWER_LENGTH,
+} from "./model";
 import { PageTitle, Empty, NotFound, Notice } from "./shell";
 import { CvAttachment } from "./cv-attachment";
 import { MatchScore } from "./match-score";
 import { RecruitingApplication } from "./recruiting-application";
+import {
+  emptyProject,
+  projectQuestions,
+  projectSubmissionSchema,
+  projectText,
+  projectContextForRole,
+  roleProjectQuestions,
+} from "./project-description";
 import { CandidateApplication } from "./candidate-application";
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -238,7 +252,11 @@ export function ApplyPage() {
   const draft = state.drafts.find((x) => x.jobId === job?.id && x.candidateId === person.id);
   const notes = draft?.notes ?? "";
   const generated = draft?.generated ?? "";
-  const [answer, setAnswer] = useState(draft?.answer ?? "");
+  const [legacy] = useState(!!draft && !draft.project);
+  const [project, setProject] = useState(draft?.project ?? { ...emptyProject });
+  const [legacyAnswer, setAnswer] = useState(draft?.answer ?? "");
+  const [introduction, setIntroduction] = useState(draft?.introduction ?? "");
+  const answer = legacy ? legacyAnswer : projectText(project);
   const [consent, setConsent] = useState(false);
   const [message, setMessage] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -254,9 +272,13 @@ export function ApplyPage() {
     return () => window.clearTimeout(timeout);
   }, [submitted, navigate]);
   const answerLength = answer.trim().length;
-  const answerInvalid = attempted && answerLength < MIN_APPLICATION_ANSWER_LENGTH;
+  const projectValid = projectSubmissionSchema.safeParse(project).success;
+  const answerInvalid =
+    attempted && (legacy ? answerLength < MIN_APPLICATION_ANSWER_LENGTH : !projectValid);
   const consentInvalid = attempted && !consent;
   if (!job) return <NotFound />;
+  const roleContext = projectContextForRole(job);
+  const questions = roleProjectQuestions(roleContext);
   const existing = state.applications.find(
     (x) => x.jobId === job.id && x.candidateId === person.id,
   );
@@ -273,15 +295,40 @@ export function ApplyPage() {
     e.preventDefault();
     if (submittedOnce.current) return;
     setAttempted(true);
-    if (answerLength < MIN_APPLICATION_ANSWER_LENGTH) {
-      answerInput.current?.focus();
+    if (
+      !legacy &&
+      introduction.trim() &&
+      introduction.trim().length < MIN_APPLICATION_ANSWER_LENGTH
+    ) {
+      document.getElementById("candidate-introduction")?.focus();
+      return;
+    }
+    if (legacy ? answerLength < MIN_APPLICATION_ANSWER_LENGTH : !projectValid) {
+      if (legacy) answerInput.current?.focus();
+      else
+        document
+          .getElementById(
+            `project-${projectQuestions.find(({ key }) => !project[key].trim() || project[key].trim().length > 2000)?.key}`,
+          )
+          ?.focus();
       return;
     }
     if (!consent) {
       document.getElementById("application-consent")?.focus();
       return;
     }
-    if (run({ type: "submit", jobId: job!.id, notes, generated, answer, consent })) {
+    if (
+      run({
+        type: "submit",
+        jobId: job!.id,
+        notes,
+        generated,
+        answer,
+        consent,
+        project: legacy ? undefined : project,
+        introduction: legacy ? undefined : introduction,
+      })
+    ) {
       submittedOnce.current = true;
       setSubmitted(true);
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -322,36 +369,116 @@ export function ApplyPage() {
               contextLabel="CV z Twojego profilu"
             />
           </section>
-          <section
-            className="application-form-section application-answer"
-            aria-label="Odpowiedź do aplikacji"
-          >
-            <Field label="Dlaczego pasujesz do tej roli?">
-              <Textarea
-                disabled={submitted}
-                ref={answerInput}
-                required
-                minLength={MIN_APPLICATION_ANSWER_LENGTH}
-                maxLength={12000}
-                aria-invalid={answerInvalid || undefined}
-                aria-describedby="application-answer-help"
-                value={answer}
-                onChange={(e) => {
-                  setAnswer(e.target.value);
-                  setConsent(false);
-                }}
-              />
-            </Field>
-            <p
-              id="application-answer-help"
-              role={answerInvalid ? "alert" : undefined}
-              className={answerInvalid ? "error-message" : "text-sm text-muted-foreground"}
+          {legacy ? (
+            <section
+              className="application-form-section application-answer"
+              aria-label="Odpowiedź do aplikacji"
             >
-              {answerInvalid
-                ? `Odpowiedź jest za krótka. Wpisz co najmniej ${MIN_APPLICATION_ANSWER_LENGTH} znaków (obecnie: ${answerLength}).`
-                : `Minimum ${MIN_APPLICATION_ANSWER_LENGTH} znaków. Obecnie: ${answerLength}.`}
-            </p>
-          </section>
+              <Field label="Dlaczego pasujesz do tej roli?">
+                <Textarea
+                  disabled={submitted}
+                  ref={answerInput}
+                  required
+                  minLength={MIN_APPLICATION_ANSWER_LENGTH}
+                  maxLength={12000}
+                  aria-invalid={answerInvalid || undefined}
+                  aria-describedby="application-answer-help"
+                  value={answer}
+                  onChange={(e) => {
+                    setAnswer(e.target.value);
+                    setConsent(false);
+                  }}
+                />
+              </Field>
+              <p
+                id="application-answer-help"
+                role={answerInvalid ? "alert" : undefined}
+                className={answerInvalid ? "error-message" : "text-sm text-muted-foreground"}
+              >
+                {answerInvalid
+                  ? `Odpowiedź jest za krótka. Wpisz co najmniej ${MIN_APPLICATION_ANSWER_LENGTH} znaków (obecnie: ${answerLength}).`
+                  : `Minimum ${MIN_APPLICATION_ANSWER_LENGTH} znaków. Obecnie: ${answerLength}.`}
+              </p>
+            </section>
+          ) : (
+            <section
+              className="application-form-section application-answer"
+              aria-labelledby="project-title"
+            >
+              <h3 id="project-title">Jeden podobny projekt</h3>
+              <Field label="Odpowiedź dla rekrutera (opcjonalnie)">
+                <Textarea
+                  id="candidate-introduction"
+                  value={introduction}
+                  maxLength={12000}
+                  minLength={20}
+                  disabled={submitted}
+                  onChange={(event) => {
+                    setIntroduction(event.target.value);
+                    setConsent(false);
+                  }}
+                  placeholder="Przedstaw krótko swoje doświadczenie i powód aplikowania. Jeśli odpowiadasz, wpisz co najmniej 20 znaków."
+                />
+              </Field>
+              {attempted &&
+                introduction.trim().length > 0 &&
+                introduction.trim().length < MIN_APPLICATION_ANSWER_LENGTH && (
+                  <p role="alert" className="error-message">
+                    Wpisz co najmniej 20 znaków odpowiedzi lub pozostaw pole puste.
+                  </p>
+                )}
+              <p className="application-help">
+                Pytania dobrano do roli {roleContext.role}: {roleContext.focus}. Odnieś odpowiedzi
+                do wymagań w ofercie obok.
+              </p>
+              <p className="application-help">
+                Opisz jeden projekt podobny do pracy opisanej w tym ogłoszeniu. Może to być projekt
+                zespołowy lub samodzielny. Wybierz taki, o którym możesz bezpiecznie opowiedzieć.
+                Liczą się konkretne działania i zakres Twojej odpowiedzialności. Jeśli czegoś nie
+                robiłeś, nie wiesz lub nie możesz ujawnić, zaznacz to wprost. Nie wymagamy
+                publicznego repozytorium, poufnych danych ani liczbowego wyniku, którego nie znasz.
+              </p>
+              <p className="application-help">
+                Pracuj na danych syntetycznych. Maksymalnie 2000 znaków na odpowiedź. Szkic może
+                zawierać niepełne odpowiedzi.
+              </p>
+              {questions.map(({ key, label, help }, index) => (
+                <div className="project-question" key={key}>
+                  <label className="field" htmlFor={`project-${key}`}>
+                    <span>
+                      {index + 1}. {label}
+                    </span>
+                  </label>
+                  <p id={`project-${key}-help`} className="application-help">
+                    {help}
+                  </p>
+                  <Textarea
+                    id={`project-${key}`}
+                    value={project[key] ?? ""}
+                    rows={4}
+                    maxLength={2000}
+                    required={key !== "ai"}
+                    disabled={submitted}
+                    aria-describedby={`project-${key}-help${answerInvalid && key !== "ai" && !project[key]?.trim() ? " project-error" : ""}`}
+                    aria-invalid={
+                      (answerInvalid && key !== "ai" && !project[key]?.trim()) || undefined
+                    }
+                    onChange={(event) => {
+                      setProject({ ...project, [key]: event.target.value });
+                      setConsent(false);
+                      setMessage("");
+                    }}
+                  />
+                </div>
+              ))}
+              {answerInvalid && (
+                <p id="project-error" className="error-message" role="alert">
+                  Odpowiedz na każde pytanie. Możesz wprost zaznaczyć brak wiedzy lub możliwości
+                  ujawnienia informacji.
+                </p>
+              )}
+            </section>
+          )}
           <div className="application-form-section application-submit">
             <label className="application-consent">
               <Checkbox
@@ -387,7 +514,17 @@ export function ApplyPage() {
                 disabled={submitted}
                 variant="outline"
                 onClick={() => {
-                  if (run({ type: "draft", jobId: job.id, notes, generated, answer }))
+                  if (
+                    run({
+                      type: "draft",
+                      jobId: job.id,
+                      notes,
+                      generated,
+                      answer,
+                      project: legacy ? undefined : project,
+                      introduction: legacy ? undefined : introduction,
+                    })
+                  )
                     setMessage("Szkic został zapisany.");
                 }}
               >
@@ -450,7 +587,7 @@ export function ApplicationsPage({ employer = false }: { employer?: boolean }) {
                       ? a.jobTitle
                       : state.companies.find((x) => x.id === a.companyId)?.name}
                   </p>
-                  <p>{stageLabels[a.stage]}</p>
+                  <p>{(employer ? employerStageLabels : stageLabels)[a.stage]}</p>
                 </div>
                 <MatchScore score={a.score} />
               </div>
