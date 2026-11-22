@@ -1,10 +1,11 @@
-import type { ReactNode, Ref } from "react";
+import { type ReactNode, type Ref } from "react";
 import { BackLink } from "@/components/back-link";
 import { ProcessTimeline } from "@/components/process-timeline";
 import { RecordSheet } from "@/components/record-sheet";
 import { CvAttachment } from "./cv-attachment";
+import { ProjectDescriptionContent, projectText } from "./project-description";
 import { MatchScore } from "./match-score";
-import { stageLabels, type Application, type Stage } from "./model";
+import { employerStageLabels, stageLabels, type Application, type Stage } from "./model";
 
 type RecordEvent = { stage: Stage; at: string; note?: string };
 const dateFormat = new Intl.DateTimeFormat("pl-PL", {
@@ -21,10 +22,22 @@ export function ApplicationRecord({
   statusRef,
   children,
   footer,
+  employerReading,
 }: {
   application: Pick<
     Application,
-    "candidateId" | "candidateName" | "jobTitle" | "stage" | "answer" | "cv" | "score" | "summary"
+    | "id"
+    | "e01"
+    | "candidateId"
+    | "candidateName"
+    | "jobTitle"
+    | "stage"
+    | "answer"
+    | "cv"
+    | "score"
+    | "summary"
+    | "project"
+    | "projectContext"
   >;
   companyName: string;
   audience: "candidate" | "employer";
@@ -32,8 +45,10 @@ export function ApplicationRecord({
   statusRef?: Ref<HTMLSpanElement>;
   children?: ReactNode;
   footer?: ReactNode;
+  employerReading?: ReactNode;
 }) {
   const candidate = audience === "candidate";
+  const labels = candidate ? stageLabels : employerStageLabels;
   const title = candidate ? application.jobTitle : application.candidateName;
   const context = candidate ? application.candidateName : application.jobTitle;
   const submitted = history[0];
@@ -53,9 +68,9 @@ export function ApplicationRecord({
             {context} · {companyName}
           </span>
           <span className="record-stage" tabIndex={-1} ref={statusRef}>
-            {stageLabels[application.stage]}
+            {labels[application.stage]}
           </span>
-          <MatchScore score={application.score} />
+          {candidate && <MatchScore score={application.score} />}
           {submitted && (
             <span>
               Złożona:{" "}
@@ -65,55 +80,77 @@ export function ApplicationRecord({
         </div>
       </header>
       <div className="recruiting-layout">
-        <RecordSheet
-          label={candidate ? "Twoja wysłana aplikacja" : "Materiały kandydata"}
-          sections={[
-            {
-              value: "answer",
-              label: "Odpowiedź",
-              content: (
-                <>
-                  <h3>Przesłana aplikacja</h3>
-                  <p>{application.answer}</p>
-                </>
-              ),
-            },
-            {
-              value: "cv",
-              label: "CV",
-              content: (
-                <>
-                  <h3>CV z momentu aplikowania</h3>
-                  <CvAttachment
-                    candidateId={application.candidateId}
-                    fallbackText={application.cv}
-                    layout="row"
-                    preview
-                  />
-                </>
-              ),
-            },
-          ]}
-          footer={footer}
-        >
-          {children}
-        </RecordSheet>
+        {candidate ? (
+          <RecordSheet
+            label={candidate ? "Twoja wysłana aplikacja" : "Materiały kandydata"}
+            sections={[
+              {
+                value: "answer",
+                label: "Odpowiedź",
+                content: (
+                  <>
+                    <h3>Przesłana aplikacja</h3>
+                    {(!application.project ||
+                      application.answer !== projectText(application.project)) && (
+                      <p>{application.answer}</p>
+                    )}
+                    {application.project && (
+                      <ProjectDescriptionContent
+                        project={application.project}
+                        context={application.projectContext}
+                      />
+                    )}
+                  </>
+                ),
+              },
+              {
+                value: "cv",
+                label: "CV",
+                content: (
+                  <>
+                    <h3>CV z momentu aplikowania</h3>
+                    <CvAttachment
+                      candidateId={application.candidateId}
+                      fallbackText={application.cv}
+                      layout="row"
+                      preview
+                    />
+                  </>
+                ),
+              },
+            ]}
+            footer={footer}
+          >
+            {children}
+          </RecordSheet>
+        ) : (
+          <RecordSheet
+            label="Materiały kandydata"
+            sections={[]}
+            footer={footer}
+            reading={employerReading}
+          >
+            {children}
+          </RecordSheet>
+        )}
         <aside className="recruiting-margin" aria-label="Historia i podsumowanie">
           <section aria-labelledby="process-heading">
             <h2 id="process-heading">Historia procesu</h2>
             <ProcessTimeline
               items={history.map((event, index) => ({
                 id: `${index}-${event.at}`,
-                title: stageLabels[event.stage],
+                title: labels[event.stage],
                 dateTime: event.at,
                 content: event.note || undefined,
               }))}
             />
           </section>
-          <section className="record-summary" aria-labelledby="summary-heading">
-            <h2 id="summary-heading">Podsumowanie</h2>
-            <p>{application.summary}</p>
-          </section>
+          {candidate && (
+            <section className="record-summary" aria-labelledby="summary-heading">
+              <h2 id="summary-heading">Podsumowanie</h2>
+              <p>{application.summary}</p>
+            </section>
+          )}
         </aside>
       </div>
     </article>

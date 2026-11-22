@@ -299,3 +299,243 @@
   background: var(--gui-color-1);
   color: var(--gui-text);
 }
+
+/* Project form and sequential recruiter reading use the host sheet anatomy. */
+.project-question {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gui-edge);
+  min-width: 0;
+}
+.project-question .application-help {
+  margin-block: 10px 14px;
+}
+.project-question h4 {
+  font-size: 22px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.project-question textarea {
+  width: 100%;
+}
+.project-description {
+  margin-block: 24px;
+}
+
+.e01-review,
+.e01-options {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.e01-form {
+  display: grid;
+  gap: var(--gui-space-m);
+  min-width: 0;
+}
+.e01-form > [data-slot="button"] {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
+.e01-options {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.e01-options legend {
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+.e01-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--gui-edge);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.e01-options label:has(input:checked) {
+  background: var(--gui-color-1);
+}
+.e01-options input {
+  margin-top: 4px;
+  flex-shrink: 0;
+  accent-color: var(--gui-text);
+}
+
+/* Recruiter screening composes a single host reading surface. */
+.candidate-review {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.candidate-review-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 20px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--gui-edge);
+}
+.candidate-review-nav :is([data-slot="button"], a) {
+  min-height: 40px;
+  padding-inline: 10px;
+  font-size: 13px;
+  white-space: normal;
+}
+.candidate-review :is(#candidate-more-heading, #candidate-assessment-heading) {
+  scroll-margin-block-start: 24px;
+}
+.candidate-answer-bubble {
+  position: relative;
+  margin-inline-start: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--gui-edge);
+  border-radius: var(--gui-radius-s);
+  background: var(--background);
+}
+.candidate-answer-bubble::before {
+  position: absolute;
+  inset-block-start: 16px;
+  inset-inline-start: -5px;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-inline-start: 1px solid var(--gui-edge);
+  border-block-end: 1px solid var(--gui-edge);
+  background: inherit;
+  content: "";
+}
+.candidate-answer-bubble strong {
+  display: block;
+  margin-block-end: 6px;
+  font-size: 13px;
+}
+.candidate-answer-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.candidate-review h4 {
+  margin-block: 18px 12px;
+  font-size: 22px;
+  line-height: 1.35;
+}
+.candidate-review-cv {
+  margin-top: 24px;
+}
+.candidate-review-cv > [data-slot="button"] {
+  margin-top: 14px;
+}
+.candidate-review-section,
+.candidate-review-result {
+  border-top: 1px solid var(--gui-edge);
+  margin-top: 30px;
+  padding-top: 28px;
+}
+.candidate-review-result > p,
+.candidate-review-section > p {
+  margin-block: 12px;
+}
+.candidate-review-current-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.candidate-review-form {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.candidate-review-form h3 {
+  margin-bottom: 0;
+}
+.candidate-review-form .e01-options label:has(input:checked) {
+  background: var(--gui-text);
+  color: var(--card);
+}
+.candidate-review-form .e01-options input:checked {
+  accent-color: var(--card);
+}
+.candidate-review-form .e01-options label:has(input:focus-visible) {
+  outline: 2px solid var(--gui-focus);
+  outline-offset: 2px;
+}
+.candidate-review-note .record-caption {
+  margin-block: 10px 16px;
+}
+.candidate-review-save {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid var(--gui-edge);
+}
+.candidate-role-context {
+  margin-top: 18px;
+}
+.candidate-role-context summary {
+  cursor: pointer;
+  padding-block: 10px;
+  font-weight: 600;
+}
+.candidate-review [data-slot="button"] {
+  max-width: 100%;
+  white-space: normal;
+}
+.candidate-review-dialog[data-slot="dialog-content"] {
+  --review-dialog-space-inline: 25px;
+  --review-dialog-space-block: 25px;
+  width: calc(100% - 36px);
+  max-width: 580px;
+  max-height: calc(100dvh - 48px);
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--gui-edge);
+  border-radius: var(--gui-radius-m);
+  background: var(--background);
+  box-shadow: none;
+}
+.candidate-review-dialog [data-slot="dialog-header"] {
+  padding: var(--review-dialog-space-block) 70px var(--review-dialog-space-block)
+    var(--review-dialog-space-inline);
+  border-bottom: 1px solid var(--gui-edge);
+  background: var(--card);
+}
+.candidate-review-dialog [data-slot="dialog-close"] {
+  top: var(--review-dialog-space-block);
+  right: var(--review-dialog-space-inline);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--gui-edge);
+  border-radius: var(--gui-radius-full);
+}
+.candidate-review-dialog [data-slot="dialog-title"] {
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+}
+.candidate-review-dialog [data-slot="dialog-description"] {
+  padding: var(--review-dialog-space-block) var(--review-dialog-space-inline);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.candidate-review-dialog [data-slot="dialog-footer"] {
+  margin-top: 0;
+  padding: 0 var(--review-dialog-space-inline) var(--review-dialog-space-block);
+}
+@media (max-width: 600px) {
+  .candidate-review-dialog[data-slot="dialog-content"] {
+    --review-dialog-space-inline: 20px;
+    --review-dialog-space-block: 22px;
+  }
+  .candidate-review-dialog [data-slot="dialog-title"] {
+    font-size: 23px;
+  }
+  .candidate-review-dialog [data-slot="dialog-description"] {
+    font-size: 14px;
+  }
+}
